@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#14181a">
+<title>Base de Aberturas de Xadrez</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14181a; --panel:#1c2225; --panel-2:#202729; --border:#2b3336;
+  --text:#f1ece1; --text-dim:#8a9297;
+  --amber:#e3a730; --amber-glow:rgba(227,167,48,0.28); --amber-soft:rgba(227,167,48,0.14);
+  --red:#d6524a;
+  --sq-light:#d9c9a6; --sq-dark:#7c5a3a;
+  --safe-t:env(safe-area-inset-top); --safe-b:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%; margin:0;}
+body{background:var(--bg); color:var(--text); font-family:'Fraunces',Georgia,serif; min-height:100vh;}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
+#app{max-width:720px; margin:0 auto; padding:calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 24px);}
+h1{font-size:22px; font-weight:700; margin:0 0 2px; text-align:center;}
+.sub{font-size:12.5px; color:var(--text-dim); text-align:center; margin:0 0 18px; font-family:'JetBrains Mono',monospace;}
+.searchbox{width:100%; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:13px 16px;
+  color:var(--text); font-size:15px; font-family:'JetBrains Mono',monospace; margin-bottom:12px;}
+.searchbox::placeholder{color:var(--text-dim);}
+.chips{display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:14px; -webkit-overflow-scrolling:touch;}
+.chip{flex-shrink:0; background:var(--panel); border:1px solid var(--border); border-radius:20px; padding:7px 14px;
+  font-size:12px; font-family:'JetBrains Mono',monospace; color:var(--text-dim); white-space:nowrap;}
+.chip.active{border-color:var(--amber); background:var(--amber-glow); color:var(--amber);}
+.count{font-size:11.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-bottom:10px;}
+.list{display:flex; flex-direction:column; gap:8px;}
+.card{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:13px 15px; text-align:left; width:100%; color:var(--text); font-family:inherit;}
+.card:active{background:var(--panel-2); border-color:var(--amber);}
+.card-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+.card-name{font-size:15px; font-weight:600;}
+.card-eco{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--amber); flex-shrink:0;}
+.card-breadcrumb{font-size:10.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-top:2px;}
+.card-moves{font-size:12px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.empty{text-align:center; color:var(--text-dim); font-size:13px; padding:30px 10px; font-family:'JetBrains Mono',monospace;}
+
+/* overlay de detalhe */
+.overlay{position:fixed; inset:0; background:rgba(20,24,26,0.97); z-index:30; display:none;
+  flex-direction:column; overflow-y:auto; padding:calc(var(--safe-t) + 16px) 18px calc(var(--safe-b) + 24px);}
+.overlay.show{display:flex;}
+.closebtn{position:absolute; top:calc(var(--safe-t) + 14px); right:16px; background:var(--panel); border:1px solid var(--border);
+  color:var(--text); width:36px; height:36px; border-radius:10px; font-size:18px; display:flex; align-items:center; justify-content:center;}
+.detail-title{font-size:21px; font-weight:700; margin:8px 40px 2px 0;}
+.detail-eco{font-family:'JetBrains Mono',monospace; color:var(--amber); font-size:13px; margin-bottom:2px;}
+.detail-breadcrumb{font-size:11.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-bottom:14px;}
+.detail-idea{font-size:14.5px; line-height:1.5; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:16px;}
+#miniBoard{display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr);
+  width:min(78vw,320px); height:min(78vw,320px); margin:0 auto; border:3px solid var(--panel-2); border-radius:6px; overflow:hidden;}
+.msq{position:relative; display:flex; align-items:center; justify-content:center;}
+.msq.light{background:var(--sq-light);} .msq.dark{background:var(--sq-dark);}
+.msq.hi{box-shadow:inset 0 0 0 3px rgba(227,167,48,0.6);}
+.msq .p{font-size:min(6.5vw,26px); line-height:1; paint-order:stroke fill;}
+.msq .p.white{color:#fffdf6; -webkit-text-stroke:1.2px #0c0c0c;}
+.msq .p.black{color:#0c0a08; -webkit-text-stroke:1.2px #fff8ea;}
+.stepper{display:flex; align-items:center; justify-content:center; gap:14px; margin-top:14px;}
+.stepbtn{background:var(--panel); border:1px solid var(--border); color:var(--text); width:40px; height:40px;
+  border-radius:10px; font-size:18px; display:flex; align-items:center; justify-content:center;}
+.stepbtn:active{background:var(--panel-2);}
+.stepbtn:disabled{opacity:0.35;}
+.steplabel{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-dim); min-width:60px; text-align:center;}
+.movelist{display:flex; flex-wrap:wrap; gap:6px; margin-top:16px; justify-content:center;}
+.movetag{font-family:'JetBrains Mono',monospace; font-size:12.5px; background:var(--panel); border:1px solid var(--border);
+  border-radius:8px; padding:5px 10px; color:var(--text-dim);}
+.movetag.done{color:var(--text); border-color:var(--amber-glow); background:var(--amber-soft);}
+.childrenlbl{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.5px; color:var(--text-dim); margin:20px 0 8px;}
+.signature{font-size:11px; color:var(--text-dim); text-align:center; margin-top:20px; font-family:'JetBrains Mono',monospace;}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>♟️ Base de Aberturas de Xadrez</h1>
+  <p class="sub">107 aberturas e contra-aberturas · pesquise por nome, código ECO ou lance</p>
+  <input class="searchbox" id="searchBox" type="text" placeholder="Buscar: 'siciliana', 'C60', 'Nf3'…" inputmode="search">
+  <div class="chips" id="familyChips"></div>
+  <div class="count" id="resultCount"></div>
+  <div class="list" id="list"></div>
+  <p class="signature">Desenvolvido por Rodrigo Aiosa</p>
+</div>
+
+<div class="overlay" id="detailOverlay">
+  <button class="closebtn" onclick="closeDetail()">✕</button>
+  <div class="detail-eco" id="detailEco"></div>
+  <div class="detail-title" id="detailTitle"></div>
+  <div class="detail-breadcrumb" id="detailBreadcrumb"></div>
+  <div class="detail-idea" id="detailIdea"></div>
+  <div id="miniBoard"></div>
+  <div class="stepper">
+    <button class="stepbtn" id="stepPrev" onclick="stepMove(-1)">‹</button>
+    <div class="steplabel" id="stepLabel">0/0</div>
+    <button class="stepbtn" id="stepNext" onclick="stepMove(1)">›</button>
+  </div>
+  <div class="movelist" id="moveList"></div>
+  <div id="childrenSection"></div>
+</div>
+
+<script>
+/* ==================== MOTOR MÍNIMO (mesmo núcleo do jogo principal) ==================== */
+const FILES='abcdefgh';
+const GLYPH={w:{K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'}, b:{K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟'}};
+const ROOK_DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+const BISHOP_DIRS=[[1,1],[1,-1],[-1,1],[-1,-1]];
+const KNIGHT_OFF=[[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]];
+const KING_DIRS=[...ROOK_DIRS,...BISHOP_DIRS];
+function inBounds(r,c){return r>=0&&r<8&&c>=0&&c<8;}
+function opp(c){return c==='w'?'b':'w';}
+function cloneBoard(b){return b.map(row=>row.slice());}
+function freshBoard(){
+  const b=Array.from({length:8},()=>Array(8).fill(null));
+  const back=['R','N','B','Q','K','B','N','R'];
+  for(let c=0;c<8;c++){ b[0][c]={t:back[c],c:'w'}; b[1][c]={t:'P',c:'w'}; b[7][c]={t:back[c],c:'b'}; b[6][c]={t:'P',c:'b'}; }
+  return b;
+}
+function isSquareAttacked(bd,r,c,byColor){
+  for(const [dr,dc] of KNIGHT_OFF){ const nr=r+dr,nc=c+dc; if(inBounds(nr,nc)){const p=bd[nr][nc]; if(p&&p.c===byColor&&p.t==='N') return true;} }
+  for(const [dr,dc] of KING_DIRS){ const nr=r+dr,nc=c+dc; if(inBounds(nr,nc)){const p=bd[nr][nc]; if(p&&p.c===byColor&&p.t==='K') return true;} }
+  const pdir = byColor==='w' ? -1 : 1;
+  for(const dc of [-1,1]){ const pr=r+pdir, pc=c+dc; if(inBounds(pr,pc)){const p=bd[pr][pc]; if(p&&p.c===byColor&&p.t==='P') return true;} }
+  for(const [dr,dc] of ROOK_DIRS){ let nr=r+dr,nc=c+dc; while(inBounds(nr,nc)){ const p=bd[nr][nc]; if(p){ if(p.c===byColor&&(p.t==='R'||p.t==='Q')) return true; break;} nr+=dr;nc+=dc; } }
+  for(const [dr,dc] of BISHOP_DIRS){ let nr=r+dr,nc=c+dc; while(inBounds(nr,nc)){ const p=bd[nr][nc]; if(p){ if(p.c===byColor&&(p.t==='B'||p.t==='Q')) return true; break;} nr+=dr;nc+=dc; } }
+  return false;
+}
+function findKing(bd,color){ for(let r=0;r<8;r++) for(let c=0;c<8;c++){ const p=bd[r][c]; if(p&&p.c===color&&p.t==='K') return {r,c}; } return null; }
+function isKingInCheck(bd,color){ const k=findKing(bd,color); return k ? isSquareAttacked(bd,k.r,k.c,opp(color)) : false; }
+function generatePseudoMoves(bd,r,c,cast,ep){
+  const piece=bd[r][c]; if(!piece) return [];
+  const color=piece.c, o=opp(color); const moves=[];
+  if(piece.t==='P'){
+    const dir=color==='w'?1:-1, startRow=color==='w'?1:6, promoRow=color==='w'?7:0;
+    const r1=r+dir;
+    const addFwd=(tr,tc)=>{
+      if(tr===promoRow){ for(const pp of ['Q','R','B','N']) moves.push({fromR:r,fromC:c,toR:tr,toC:tc,promo:pp,capture:false}); }
+      else moves.push({fromR:r,fromC:c,toR:tr,toC:tc,capture:false});
+    };
+    if(inBounds(r1,c) && !bd[r1][c]){ addFwd(r1,c); if(r===startRow){ const r2=r+2*dir; if(!bd[r2][c]) moves.push({fromR:r,fromC:c,toR:r2,toC:c,flag:'double'}); } }
+    for(const dc of [-1,1]){
+      const nc=c+dc; if(!inBounds(r1,nc)) continue;
+      const t=bd[r1][nc];
+      if(t && t.c===o){ if(r1===promoRow){ for(const pp of ['Q','R','B','N']) moves.push({fromR:r,fromC:c,toR:r1,toC:nc,promo:pp,capture:true}); } else moves.push({fromR:r,fromC:c,toR:r1,toC:nc,capture:true}); }
+      else if(ep && ep.r===r1 && ep.c===nc){ moves.push({fromR:r,fromC:c,toR:r1,toC:nc,flag:'ep',capture:true}); }
+    }
+  } else if(piece.t==='N'){
+    for(const [dr,dc] of KNIGHT_OFF){ const nr=r+dr,nc=c+dc; if(!inBounds(nr,nc)) continue; const t=bd[nr][nc]; if(!t||t.c===o) moves.push({fromR:r,fromC:c,toR:nr,toC:nc,capture:!!t}); }
+  } else if(piece.t==='B'||piece.t==='R'||piece.t==='Q'){
+    const dirs = piece.t==='B'?BISHOP_DIRS : piece.t==='R'?ROOK_DIRS : KING_DIRS;
+    for(const [dr,dc] of dirs){ let nr=r+dr,nc=c+dc; while(inBounds(nr,nc)){ const t=bd[nr][nc]; if(!t){ moves.push({fromR:r,fromC:c,toR:nr,toC:nc,capture:false}); } else { if(t.c===o) moves.push({fromR:r,fromC:c,toR:nr,toC:nc,capture:true}); break; } nr+=dr; nc+=dc; } }
+  } else if(piece.t==='K'){
+    for(const [dr,dc] of KING_DIRS){ const nr=r+dr,nc=c+dc; if(!inBounds(nr,nc)) continue; const t=bd[nr][nc]; if(!t||t.c===o) moves.push({fromR:r,fromC:c,toR:nr,toC:nc,capture:!!t}); }
+    const row=color==='w'?0:7;
+    if(r===row && c===4){
+      const canK = color==='w'?cast.wK:cast.bK, canQ = color==='w'?cast.wQ:cast.bQ;
+      if(canK && !bd[row][5] && !bd[row][6] && bd[row][7] && bd[row][7].t==='R' && bd[row][7].c===color){
+        if(!isSquareAttacked(bd,row,4,o) && !isSquareAttacked(bd,row,5,o) && !isSquareAttacked(bd,row,6,o)) moves.push({fromR:r,fromC:c,toR:row,toC:6,flag:'O-O'});
+      }
+      if(canQ && !bd[row][1] && !bd[row][2] && !bd[row][3] && bd[row][0] && bd[row][0].t==='R' && bd[row][0].c===color){
+        if(!isSquareAttacked(bd,row,4,o) && !isSquareAttacked(bd,row,3,o) && !isSquareAttacked(bd,row,2,o)) moves.push({fromR:r,fromC:c,toR:row,toC:2,flag:'O-O-O'});
+      }
+    }
+  }
+  return moves;
+}
+function simulateMove(bd,move){
+  const nb=cloneBoard(bd);
+  const piece=nb[move.fromR][move.fromC];
+  nb[move.fromR][move.fromC]=null;
+  if(move.flag==='ep') nb[move.fromR][move.toC]=null;
+  nb[move.toR][move.toC]= move.promo ? {t:move.promo,c:piece.c} : piece;
+  if(move.flag==='O-O'){ const row=move.fromR; nb[row][5]=nb[row][7]; nb[row][7]=null; }
+  if(move.flag==='O-O-O'){ const row=move.fromR; nb[row][3]=nb[row][0]; nb[row][0]=null; }
+  return nb;
+}
+function allLegalMovesForState(state,color){
+  let all=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=state.board[r][c]; if(!p||p.c!==color) continue;
+    const pseudo=generatePseudoMoves(state.board,r,c,state.castling,state.epTarget);
+    all=all.concat(pseudo.filter(m=>!isKingInCheck(simulateMove(state.board,m), p.c)));
+  }
+  return all;
+}
+function applyMoveToState(state,move){
+  const bd=simulateMove(state.board,move);
+  const castlingN={...state.castling};
+  const piece=state.board[move.fromR][move.fromC];
+  if(piece.t==='K'){ if(piece.c==='w'){castlingN.wK=false;castlingN.wQ=false;} else {castlingN.bK=false;castlingN.bQ=false;} }
+  if(piece.t==='R'){
+    if(move.fromR===0&&move.fromC===0) castlingN.wQ=false;
+    if(move.fromR===0&&move.fromC===7) castlingN.wK=false;
+    if(move.fromR===7&&move.fromC===0) castlingN.bQ=false;
+    if(move.fromR===7&&move.fromC===7) castlingN.bK=false;
+  }
+  if(move.toR===0&&move.toC===0) castlingN.wQ=false;
+  if(move.toR===0&&move.toC===7) castlingN.wK=false;
+  if(move.toR===7&&move.toC===0) castlingN.bQ=false;
+  if(move.toR===7&&move.toC===7) castlingN.bK=false;
+  const epTargetN=(move.flag==='double') ? {r:(move.fromR+move.toR)/2, c:move.fromC} : null;
+  return {board:bd, castling:castlingN, epTarget:epTargetN, turn:opp(state.turn)};
+}
+function sq(r,c){ return FILES[c]+String(r+1); }
+function sanForMove(state, mv){
+  if(mv.flag==='O-O') return 'O-O';
+  if(mv.flag==='O-O-O') return 'O-O-O';
+  const piece=state.board[mv.fromR][mv.fromC];
+  const dest=sq(mv.toR,mv.toC);
+  if(piece.t==='P'){
+    let s = mv.capture ? (FILES[mv.fromC]+'x'+dest) : dest;
+    if(mv.promo) s+='='+mv.promo;
+    return s;
+  }
+  const rivals=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    if(r===mv.fromR && c===mv.fromC) continue;
+    const p=state.board[r][c];
+    if(p && p.c===piece.c && p.t===piece.t){
+      const legal=allLegalMovesForState(state,piece.c).filter(m=>m.fromR===r&&m.fromC===c);
+      if(legal.some(m=>m.toR===mv.toR && m.toC===mv.toC)) rivals.push({r,c});
+    }
+  }
+  let dis='';
+  if(rivals.length){
+    const sameFile=rivals.some(o=>o.c===mv.fromC), sameRank=rivals.some(o=>o.r===mv.fromR);
+    if(!sameFile) dis=FILES[mv.fromC]; else if(!sameRank) dis=String(mv.fromR+1); else dis=FILES[mv.fromC]+String(mv.fromR+1);
+  }
+  return piece.t+dis+(mv.capture?'x':'')+dest;
+}
+function resolveSAN(state, token){
+  token = token.replace(/[+#!?]+$/,'');
+  const legal = allLegalMovesForState(state, state.turn);
+  for(const mv of legal){
+    const san = sanForMove(state, mv).replace(/[+#]+$/,'');
+    if(san===token) return mv;
+  }
+  return null;
+}
+// Reproduz uma abertura (string SAN) do início e devolve cada posição intermediária.
+function replayOpening(movesStr){
+  let state = {board:freshBoard(), castling:{wK:true,wQ:true,bK:true,bQ:true}, epTarget:null, turn:'w'};
+  const snapshots=[{board:cloneBoard(state.board), lastMove:null, san:null}];
+  const tokens = movesStr.trim().split(/\s+/);
+  for(const tok of tokens){
+    const mv = resolveSAN(state, tok);
+    if(!mv) break;
+    const san = sanForMove(state, mv);
+    state = applyMoveToState(state, mv);
+    snapshots.push({board:cloneBoard(state.board), lastMove:{fromR:mv.fromR,fromC:mv.fromC,toR:mv.toR,toC:mv.toC}, san});
+  }
+  return snapshots;
+}
+
+/* ==================== DADOS ==================== */
+const OPENINGS = [{"id":"e4","eco":"B00","name":"Abertura do Peão do Rei","family":"Raiz","parent":null,"moves":"e4","idea":"Abre linhas para o bispo e a dama, luta pelo centro e libera o desenvolvimento rápido das peças menores."},{"id":"e4e5","eco":"C20","name":"Jogo Aberto (1...e5)","family":"Abertas","parent":"e4","moves":"e4 e5","idea":"A resposta simétrica clássica — Pretas disputam o centro imediatamente."},{"id":"ruylopez","eco":"C60","name":"Abertura Espanhola (Ruy Lopez)","family":"Abertas","parent":"e4e5","moves":"e4 e5 Nf3 Nc6 Bb5","idea":"O bispo pressiona o cavalo que defende o peão e5, mirando pressão de longo prazo no centro."},{"id":"ruylopezclosed","eco":"C84","name":"Espanhola — Variante Fechada","family":"Abertas","parent":"ruylopez","moves":"e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7","idea":"Linha principal moderna, com jogo posicional rico dos dois lados."},{"id":"ruylopezberlin","eco":"C65","name":"Espanhola — Defesa Berlinense","family":"Abertas","parent":"ruylopez","moves":"e4 e5 Nf3 Nc6 Bb5 Nf6","idea":"Contra-ataca e4 em vez de defender passivamente; leva a finais técnicos famosos pela solidez."},{"id":"ruylopezexchange","eco":"C68","name":"Espanhola — Variante da Troca","family":"Abertas","parent":"ruylopez","moves":"e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6","idea":"Brancas trocam o bispo por cavalo, danificando os peões pretos, mas cedendo o par de bispos."},{"id":"italiano","eco":"C50","name":"Jogo Italiano (Giuoco Piano)","family":"Abertas","parent":"e4e5","moves":"e4 e5 Nf3 Nc6 Bc4 Bc5","idea":"Desenvolvimento natural e rápido, mirando o ponto fraco f7."},{"id":"evans","eco":"C51","name":"Gambito Evans","family":"Gambitos","parent":"italiano","moves":"e4 e5 Nf3 Nc6 Bc4 Bc5 b4","idea":"Sacrifica um peão para ganhar tempo e um centro de peões dominante."},{"id":"duascavalos","eco":"C55","name":"Defesa dos Dois Cavalos","family":"Abertas","parent":"e4e5","moves":"e4 e5 Nf3 Nc6 Bc4 Nf6","idea":"Pretas contra-atacam e4 imediatamente em vez de espelhar o desenvolvimento do bispo."},{"id":"friedliver","eco":"C57","name":"Ataque Fegatello (Fried Liver)","family":"Gambitos","parent":"duascavalos","moves":"e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Nxd5 Nxf7","idea":"Sacrifício de cavalo clássico para expor o rei preto no centro."},{"id":"scotch","eco":"C44","name":"Abertura Escocesa (Scotch Game)","family":"Abertas","parent":"e4e5","moves":"e4 e5 Nf3 Nc6 d4","idea":"Abre o centro imediatamente, trocando o peão d por desenvolvimento e espaço."},{"id":"scotchgambit","eco":"C44","name":"Gambito Escocês","family":"Gambitos","parent":"scotch","moves":"e4 e5 Nf3 Nc6 d4 exd4 Bc4","idea":"Em vez de recapturar, desenvolve com tempo mirando f7, similar ao espírito do Italiano."},{"id":"goring","eco":"C44","name":"Gambito Göring","family":"Gambitos","parent":"scotch","moves":"e4 e5 Nf3 Nc6 d4 exd4 c3","idea":"Oferece um segundo peão para acelerar ainda mais o desenvolvimento."},{"id":"petrov","eco":"C42","name":"Defesa Petrov (Russa)","family":"Abertas","parent":"e4e5","moves":"e4 e5 Nf3 Nf6","idea":"Espelha o ataque em vez de defender e5 diretamente — muito sólida, popular em nível de elite."},{"id":"philidor","eco":"C41","name":"Defesa Philidor","family":"Abertas","parent":"e4e5","moves":"e4 e5 Nf3 d6","idea":"Defende e5 com o peão d, mas cede um pouco de espaço e mobilidade das peças."},{"id":"kinggambit","eco":"C30","name":"Gambito do Rei","family":"Gambitos","parent":"e4e5","moves":"e4 e5 f4","idea":"Sacrifica um peão para abrir a coluna f e atacar rapidamente o rei preto."},{"id":"kinggambitaccepted","eco":"C33","name":"Gambito do Rei Aceito","family":"Gambitos","parent":"kinggambit","moves":"e4 e5 f4 exf4","idea":"Pretas aceitam o peão extra, mas Brancas ganham enorme iniciativa e linhas abertas."},{"id":"kinggambitdeclined","eco":"C30","name":"Gambito do Rei Recusado (Clássico)","family":"Gambitos","parent":"kinggambit","moves":"e4 e5 f4 Bc5","idea":"Pretas ignoram o peão f4 e desenvolvem naturalmente, evitando complicações táticas."},{"id":"falkbeer","eco":"C31","name":"Contragambito Falkbeer","family":"Gambitos","parent":"kinggambit","moves":"e4 e5 f4 d5","idea":"Pretas devolvem o gambito com seu próprio sacrifício, abrindo o centro contra o rei branco."},{"id":"vienna","eco":"C25","name":"Abertura Vienense","family":"Abertas","parent":"e4e5","moves":"e4 e5 Nc3","idea":"Desenvolvimento flexível que pode transpor para o Gambito do Rei ou linhas mais calmas."},{"id":"viennagambit","eco":"C29","name":"Gambito Vienense","family":"Gambitos","parent":"vienna","moves":"e4 e5 Nc3 Nf6 f4","idea":"Combina as ideias da Vienense com um avanço agressivo de f4."},{"id":"bishopsopening","eco":"C23","name":"Jogo do Bispo (Bishop's Opening)","family":"Abertas","parent":"e4e5","moves":"e4 e5 Bc4","idea":"Desenvolve o bispo antes do cavalo, mantendo flexibilidade de ordem de lances."},{"id":"centergame","eco":"C21","name":"Jogo do Centro (Center Game)","family":"Abertas","parent":"e4e5","moves":"e4 e5 d4 exd4 Qxd4","idea":"Abre o centro cedo e traz a dama, mas perde tempo se ela for atacada."},{"id":"danish","eco":"C21","name":"Gambito Dinamarquês","family":"Gambitos","parent":"e4e5","moves":"e4 e5 d4 exd4 c3","idea":"Sacrifica um ou dois peões para desenvolver ambos os bispos com tempo ganho."},{"id":"latvian","eco":"C40","name":"Gambito Letão (Latvian)","family":"Gambitos","parent":"e4e5","moves":"e4 e5 Nf3 f5","idea":"Contra-ataque arriscado e agudo logo na segunda jogada das Pretas."},{"id":"sicilian","eco":"B20","name":"Defesa Siciliana","family":"Semiabertas","parent":"e4","moves":"e4 c5","idea":"A defesa mais popular e combativa contra 1.e4 — Pretas lutam por atividade em vez de simetria."},{"id":"sicopen","eco":"B50","name":"Siciliana Aberta","family":"Semiabertas","parent":"sicilian","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3","idea":"Brancas trocam o peão d por um forte desenvolvimento central e iniciativa."},{"id":"najdorf","eco":"B90","name":"Siciliana — Variante Najdorf","family":"Semiabertas","parent":"sicopen","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","idea":"A linha mais teórica e respeitada do xadrez moderno — flexibilidade e contra-jogo no flanco-dama."},{"id":"dragon","eco":"B70","name":"Siciliana — Variante Dragão","family":"Semiabertas","parent":"sicopen","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6","idea":"Fianchetto agressivo do bispo em g7, mirando a longa diagonal contra o flanco-dama branco."},{"id":"scheveningen","eco":"B80","name":"Siciliana — Scheveningen","family":"Semiabertas","parent":"sicopen","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 e6","idea":"Estrutura de peões pequena e flexível, pronta para contra-atacar no centro com ...d5 ou ...e5."},{"id":"sicclassical","eco":"B56","name":"Siciliana — Variante Clássica","family":"Semiabertas","parent":"sicopen","moves":"e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 Nc6","idea":"Desenvolvimento natural das peças antes de decidir a estrutura de peões definitiva."},{"id":"sveshnikov","eco":"B33","name":"Siciliana — Sveshnikov (Lasker-Pelikan)","family":"Semiabertas","parent":"sicilian","moves":"e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 Nf6 Nc3 e5","idea":"Cede a casa d5 mas ganha espaço e atividade imediata para as peças pretas."},{"id":"taimanov","eco":"B44","name":"Siciliana — Variante Taimanov","family":"Semiabertas","parent":"sicilian","moves":"e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nc6","idea":"Estrutura flexível que adia a decisão sobre onde colocar o cavalo do rei."},{"id":"kan","eco":"B42","name":"Siciliana — Variante Kan (Paulsen)","family":"Semiabertas","parent":"sicilian","moves":"e4 c5 Nf3 e6 d4 cxd4 Nxd4 a6","idea":"Extremamente flexível — adia compromissos e prepara ...b5 com contra-jogo rápido."},{"id":"accdragon","eco":"B34","name":"Siciliana — Dragão Acelerado","family":"Semiabertas","parent":"sicilian","moves":"e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 g6","idea":"Chega à estrutura do Dragão sem comprometer o peão d cedo demais."},{"id":"sicclosed","eco":"B23","name":"Siciliana Fechada","family":"Semiabertas","parent":"sicilian","moves":"e4 c5 Nc3","idea":"Brancas evitam a troca central, optando por um plano mais lento com f4 e g3."},{"id":"grandprix","eco":"B23","name":"Ataque Grand Prix","family":"Semiabertas","parent":"sicclosed","moves":"e4 c5 Nc3 Nc6 f4","idea":"Plano agressivo com f4-f5 mirando um ataque direto ao rei preto."},{"id":"alapin","eco":"B22","name":"Siciliana — Variante Alapin","family":"Semiabertas","parent":"sicilian","moves":"e4 c5 c3","idea":"Prepara d4 com apoio de peão, evitando as linhas mais teóricas da Siciliana Aberta."},{"id":"smithmorra","eco":"B21","name":"Gambito Smith-Morra","family":"Gambitos","parent":"sicilian","moves":"e4 c5 d4 cxd4 c3","idea":"Sacrifica um peão por desenvolvimento rápido e pressão nas colunas centrais e diagonal a2-g8."},{"id":"wing","eco":"B20","name":"Ataque Wing (Siciliana)","family":"Gambitos","parent":"sicilian","moves":"e4 c5 b4","idea":"Desvia o peão c preto para abrir linhas no flanco-dama rapidamente."},{"id":"french","eco":"C00","name":"Defesa Francesa","family":"Semiabertas","parent":"e4","moves":"e4 e6","idea":"Estrutura sólida que prepara ...d5, desafiando o centro sem expor o rei cedo."},{"id":"frenchadvance","eco":"C02","name":"Francesa — Variante do Avanço","family":"Semiabertas","parent":"french","moves":"e4 e6 d4 d5 e5","idea":"Brancas fecham o centro e ganham espaço, mas o peão e5 pode virar alvo."},{"id":"frenchexchange","eco":"C01","name":"Francesa — Variante da Troca","family":"Semiabertas","parent":"french","moves":"e4 e6 d4 d5 exd5 exd5","idea":"Posição simétrica e mais calma, frequentemente buscada por quem prefere menos risco."},{"id":"frenchtarrasch","eco":"C03","name":"Francesa — Variante Tarrasch","family":"Semiabertas","parent":"french","moves":"e4 e6 d4 d5 Nd2","idea":"Evita o cravo ...Bb4 da Winawer, mantendo uma estrutura mais flexível."},{"id":"frenchclassical","eco":"C11","name":"Francesa — Variante Clássica","family":"Semiabertas","parent":"french","moves":"e4 e6 d4 d5 Nc3 Nf6","idea":"Desenvolvimento natural, mantendo a tensão central por mais tempo."},{"id":"winawer","eco":"C15","name":"Francesa — Variante Winawer","family":"Semiabertas","parent":"french","moves":"e4 e6 d4 d5 Nc3 Bb4","idea":"Crava o cavalo em c3, forçando Brancas a decidir a estrutura de peões cedo — muito aguda."},{"id":"carokann","eco":"B10","name":"Defesa Caro-Kann","family":"Semiabertas","parent":"e4","moves":"e4 c6","idea":"Prepara ...d5 sem trancar o bispo de casas claras, considerada muito sólida."},{"id":"ckadvance","eco":"B12","name":"Caro-Kann — Variante do Avanço","family":"Semiabertas","parent":"carokann","moves":"e4 c6 d4 d5 e5","idea":"Ganha espaço fechando o centro, similar em espírito à Francesa Avançada."},{"id":"ckexchange","eco":"B13","name":"Caro-Kann — Variante da Troca","family":"Semiabertas","parent":"carokann","moves":"e4 c6 d4 d5 exd5 cxd5","idea":"Estrutura simétrica e sólida, geralmente levando a um jogo mais posicional."},{"id":"panov","eco":"B13","name":"Ataque Panov-Botvinnik","family":"Semiabertas","parent":"ckexchange","moves":"e4 c6 d4 d5 exd5 cxd5 c4","idea":"Brancas aceitam peão isolado em troca de espaço e atividade das peças."},{"id":"ckclassical","eco":"B18","name":"Caro-Kann — Variante Clássica","family":"Semiabertas","parent":"carokann","moves":"e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5","idea":"Desenvolve o bispo antes de fechar a diagonal com ...e6 — a linha mais tradicional."},{"id":"cktwoknights","eco":"B10","name":"Caro-Kann — Duas Cavalos","family":"Semiabertas","parent":"carokann","moves":"e4 c6 Nc3 d5 Nf3","idea":"Adia d4, mantendo opções flexíveis de estrutura de peões."},{"id":"scandinavian","eco":"B01","name":"Defesa Escandinava","family":"Semiabertas","parent":"e4","moves":"e4 d5 exd5 Qxd5","idea":"Traz a dama cedo em troca de simplicidade e desenvolvimento direto."},{"id":"alekhine","eco":"B02","name":"Defesa Alekhine","family":"Semiabertas","parent":"e4","moves":"e4 Nf6","idea":"Provoca Brancas a avançar peões centrais, planejando atacá-los depois como alvos."},{"id":"alekhinefourpawns","eco":"B03","name":"Alekhine — Ataque dos Quatro Peões","family":"Semiabertas","parent":"alekhine","moves":"e4 Nf6 e5 Nd5 d4 d6 c4 Nb6 f4","idea":"Brancas constroem um enorme centro de peões, arriscando-se a ele ficar sobre-estendido."},{"id":"pirc","eco":"B07","name":"Defesa Pirc","family":"Semiabertas","parent":"e4","moves":"e4 d6 d4 Nf6 Nc3 g6","idea":"Cede o centro momentaneamente para golpeá-lo depois com ...c5 ou ...e5."},{"id":"modern","eco":"B06","name":"Defesa Moderna","family":"Semiabertas","parent":"e4","moves":"e4 g6","idea":"Fianchetto imediato do bispo do rei, extremamente flexível quanto à estrutura seguinte."},{"id":"nimzowitschdef","eco":"B00","name":"Defesa Nimzowitsch","family":"Semiabertas","parent":"e4","moves":"e4 Nc6","idea":"Rara e provocativa, prepara ...d5 ou ...e5 com ideias hipermodernas."},{"id":"owen","eco":"B00","name":"Defesa Owen","family":"Semiabertas","parent":"e4","moves":"e4 b6","idea":"Fianchetto imediato do bispo de casas claras, jogando de forma hipermoderna."},{"id":"d4","eco":"A40","name":"Abertura do Peão da Dama","family":"Raiz","parent":null,"moves":"d4","idea":"Controla o centro e abre a diagonal do bispo de casas claras, geralmente levando a jogos mais posicionais que 1.e4."},{"id":"d4d5","eco":"D00","name":"Jogo Fechado (1...d5)","family":"Fechadas","parent":"d4","moves":"d4 d5","idea":"Resposta simétrica clássica, disputando o centro diretamente."},{"id":"qgambit","eco":"D06","name":"Gambito da Dama","family":"Gambitos","parent":"d4d5","moves":"d4 d5 c4","idea":"Oferece um peão lateral para atrair o peão central preto e ganhar espaço."},{"id":"qgaccepted","eco":"D20","name":"Gambito da Dama Aceito","family":"Gambitos","parent":"qgambit","moves":"d4 d5 c4 dxc4","idea":"Pretas aceitam o peão, mas ele é normalmente difícil de manter — Brancas recuperam com boa posição."},{"id":"qgdeclined","eco":"D30","name":"Gambito da Dama Recusado","family":"Fechadas","parent":"qgambit","moves":"d4 d5 c4 e6","idea":"Reforça d5 solidamente, aceitando um bispo levemente pior em troca de estabilidade."},{"id":"slav","eco":"D10","name":"Defesa Eslava","family":"Fechadas","parent":"qgambit","moves":"d4 d5 c4 c6","idea":"Defende d5 sem trancar o bispo de casas claras, muito respeitada em nível de elite."},{"id":"semislav","eco":"D43","name":"Semi-Eslava","family":"Fechadas","parent":"slav","moves":"d4 d5 c4 c6 Nc3 Nf6 e3 e6","idea":"Híbrido entre a Eslava e o Gambito da Dama Recusado, muito rico taticamente."},{"id":"tarraschdef","eco":"D32","name":"Defesa Tarrasch","family":"Fechadas","parent":"qgdeclined","moves":"d4 d5 c4 e6 Nc3 c5","idea":"Aceita um peão isolado em troca de espaço e peças ativas."},{"id":"chigorin","eco":"D07","name":"Defesa Chigorin","family":"Fechadas","parent":"qgambit","moves":"d4 d5 c4 Nc6","idea":"Desenvolve o cavalo antes do peão e, uma escolha combativa e pouco ortodoxa."},{"id":"albin","eco":"D08","name":"Contragambito Albin","family":"Gambitos","parent":"qgambit","moves":"d4 d5 c4 e5","idea":"Devolve o gambito imediatamente, buscando complicações táticas rápidas."},{"id":"london","eco":"D02","name":"Sistema de Londres","family":"Fechadas","parent":"d4d5","moves":"d4 d5 Bf4","idea":"Desenvolve o bispo antes de fechá-lo com e3 — sistema fácil de aprender e muito popular em todos os níveis."},{"id":"colle","eco":"D04","name":"Sistema Colle","family":"Fechadas","parent":"d4d5","moves":"d4 d5 Nf3 Nf6 e3","idea":"Plano modesto que prepara um ataque no centro com e4 mais adiante."},{"id":"catalan","eco":"E00","name":"Abertura Catalã","family":"Indianas","parent":"d4","moves":"d4 Nf6 c4 e6 g3","idea":"Combina ideias do Gambito da Dama com o fianchetto do bispo do rei, pressão de longo prazo na diagonal."},{"id":"indian","eco":"A45","name":"Jogo Índio (1...Nf6)","family":"Indianas","parent":"d4","moves":"d4 Nf6","idea":"Adia ...d5, mantendo flexibilidade sobre onde e como contestar o centro branco."},{"id":"nimzoindian","eco":"E20","name":"Defesa Nimzo-Índia","family":"Indianas","parent":"indian","moves":"d4 Nf6 c4 e6 Nc3 Bb4","idea":"Crava o cavalo em c3, uma das defesas mais respeitadas e flexíveis do xadrez moderno."},{"id":"queensindian","eco":"E12","name":"Defesa Índia de Dama","family":"Indianas","parent":"indian","moves":"d4 Nf6 c4 e6 Nf3 b6","idea":"Fianchetto do bispo de casas claras para controlar e4 sem cravar imediatamente."},{"id":"bogoindian","eco":"E11","name":"Defesa Bogo-Índia","family":"Indianas","parent":"indian","moves":"d4 Nf6 c4 e6 Nf3 Bb4+","idea":"Xeque intermediário que força uma decisão rápida de Brancas antes de definir a estrutura."},{"id":"kingsindian","eco":"E60","name":"Defesa Índia do Rei","family":"Indianas","parent":"indian","moves":"d4 Nf6 c4 g6 Nc3 Bg7","idea":"Cede o centro para atacá-lo depois com ...e5 ou ...c5, muitas vezes com ataques opostos em flancos diferentes."},{"id":"samisch","eco":"E80","name":"Índia do Rei — Variante Sämisch","family":"Indianas","parent":"kingsindian","moves":"d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f3","idea":"Constrói uma estrutura sólida com f3, preparando Be3 e um ataque no flanco-dama."},{"id":"fourpawnsattack","eco":"E76","name":"Índia do Rei — Ataque dos Quatro Peões","family":"Indianas","parent":"kingsindian","moves":"d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4","idea":"Máxima ambição central, mas a estrutura pode se tornar um alvo se não for bem apoiada."},{"id":"grunfeld","eco":"D70","name":"Defesa Grünfeld","family":"Indianas","parent":"indian","moves":"d4 Nf6 c4 g6 Nc3 d5","idea":"Desafia o centro branco imediatamente com ...d5, aceitando ceder o centro para atacá-lo com peças."},{"id":"benoni","eco":"A56","name":"Defesa Benoni Moderna","family":"Indianas","parent":"indian","moves":"d4 Nf6 c4 c5 d5 e6","idea":"Cede espaço central em troca de um jogo desequilibrado e dinâmico, com contra-jogo na coluna c."},{"id":"benko","eco":"A57","name":"Gambito Benko","family":"Gambitos","parent":"benoni","moves":"d4 Nf6 c4 c5 d5 b5","idea":"Sacrifica um peão de flanco para abrir as colunas a e b contra o rei branco."},{"id":"oldbenoni","eco":"A43","name":"Defesa Benoni Antiga","family":"Indianas","parent":"d4","moves":"d4 c5","idea":"Versão mais direta da Benoni, sem preparar com ...Nf6 primeiro."},{"id":"budapest","eco":"A51","name":"Gambito Budapeste","family":"Gambitos","parent":"indian","moves":"d4 Nf6 c4 e5","idea":"Sacrifício de peão surpreendente que busca explorar rapidamente o desenvolvimento branco."},{"id":"oldindian","eco":"A53","name":"Defesa Índia Antiga","family":"Indianas","parent":"indian","moves":"d4 Nf6 c4 d6","idea":"Precursora da Índia do Rei, com desenvolvimento mais direto e menos fianchetto."},{"id":"trompowsky","eco":"A45","name":"Ataque Trompowsky","family":"Indianas","parent":"indian","moves":"d4 Nf6 Bg5","idea":"Sistema agressivo de Brancas que evita a maior parte da teoria das Índias tradicionais."},{"id":"veresov","eco":"D01","name":"Sistema Veresov","family":"Fechadas","parent":"d4d5","moves":"d4 Nf6 Nc3 d5 Bg5","idea":"Desenvolve rapidamente com um plano agressivo, misturando ideias de Gambito da Dama e Trompowsky."},{"id":"dutch","eco":"A80","name":"Defesa Holandesa","family":"Indianas","parent":"d4","moves":"d4 f5","idea":"Controla e4 com um peão de flanco, permitindo planos de ataque no flanco do rei."},{"id":"leningrad","eco":"A81","name":"Holandesa — Variante Leningrado","family":"Indianas","parent":"dutch","moves":"d4 f5 g3 Nf6 Bg2 g6","idea":"Combina a Holandesa com um fianchetto do bispo do rei, buscando um jogo dinâmico e agudo."},{"id":"stonewall","eco":"A90","name":"Holandesa — Variante Stonewall","family":"Indianas","parent":"dutch","moves":"d4 f5 Nf3 Nf6 g3 e6 Bg2 d5","idea":"Estrutura de peões sólida em forma de muro, controlando e4 permanentemente."},{"id":"englund","eco":"A40","name":"Gambito Englund","family":"Gambitos","parent":"d4","moves":"d4 e5","idea":"Sacrifício de peão pouco ortodoxo e raramente jogado em nível alto, mas surpreende adversários despreparados."},{"id":"blackmardiemer","eco":"D00","name":"Gambito Blackmar-Diemer","family":"Gambitos","parent":"d4","moves":"d4 Nf6 Nc3 d5 e4","idea":"Sacrifica um peão para abrir linhas centrais rapidamente contra um adversário despreparado."},{"id":"english","eco":"A10","name":"Abertura Inglesa","family":"Inglesa","parent":null,"moves":"c4","idea":"Controla d5 com um peão de flanco, mantendo grande flexibilidade de estruturas — pode transpor para dezenas de outras aberturas."},{"id":"revsicilian","eco":"A20","name":"Inglesa — Siciliana Invertida","family":"Inglesa","parent":"english","moves":"c4 e5","idea":"Pretas jogam a Siciliana com uma cor a mais (e um tempo a menos), buscando atividade similar."},{"id":"symmengl","eco":"A30","name":"Inglesa Simétrica","family":"Inglesa","parent":"english","moves":"c4 c5","idea":"Estrutura espelhada que costuma levar a um jogo mais lento e estratégico."},{"id":"anglindian","eco":"A15","name":"Sistema Anglo-Índio","family":"Inglesa","parent":"english","moves":"c4 Nf6","idea":"Flexível, frequentemente transpõe para estruturas indianas com uma coluna a mais para Brancas."},{"id":"agincourt","eco":"A13","name":"Defesa Agincourt","family":"Inglesa","parent":"english","moves":"c4 e6","idea":"Prepara ...d5 mantendo flexibilidade, podendo transpor para o Catalã ou o Gambito da Dama."},{"id":"reti","eco":"A04","name":"Abertura Réti","family":"Reti","parent":null,"moves":"Nf3","idea":"Sistema hipermoderno: controla o centro com peças antes de ocupá-lo com peões."},{"id":"retid5","eco":"A06","name":"Réti — 1...d5","family":"Reti","parent":"reti","moves":"Nf3 d5","idea":"Pretas ocupam o centro classicamente enquanto Brancas mantêm a flexibilidade."},{"id":"kia","eco":"A07","name":"Ataque Índio de Rei (KIA)","family":"Reti","parent":"reti","moves":"Nf3 d5 g3","idea":"Brancas fazem fianchetto e adiam a definição central, com plano de ataque no flanco do rei em muitas estruturas."},{"id":"bird","eco":"A02","name":"Abertura Bird","family":"Flanco","parent":null,"moves":"f4","idea":"Controla e5 com um peão de flanco, espelhando ideias da Holandesa com as cores trocadas."},{"id":"fromgambit","eco":"A02","name":"Gambito From","family":"Gambitos","parent":"bird","moves":"f4 e5","idea":"Pretas contra-atacam f4 imediatamente, abrindo linhas contra o rei branco."},{"id":"larsen","eco":"A01","name":"Ataque Nimzowitsch-Larsen","family":"Flanco","parent":null,"moves":"b3","idea":"Fianchetto imediato do bispo de casas claras, controlando e5 de longe."},{"id":"polish","eco":"A00","name":"Abertura Polonesa (Sokolsky)","family":"Flanco","parent":null,"moves":"b4","idea":"Ganha espaço no flanco-dama imediatamente, preparando Bb2 contra a diagonal longa."},{"id":"grob","eco":"A00","name":"Abertura Grob","family":"Flanco","parent":null,"moves":"g4","idea":"Extremamente arriscada e pouco ortodoxa, mira o fianchetto rápido do bispo em g2 sacrificando estrutura."},{"id":"vangeet","eco":"A00","name":"Abertura Van Geet (Dunst)","family":"Flanco","parent":null,"moves":"Nc3","idea":"Desenvolve o cavalo primeiro, mantendo total flexibilidade sobre a estrutura de peões."},{"id":"anderssen","eco":"A00","name":"Abertura Anderssen","family":"Flanco","parent":null,"moves":"a3","idea":"Lance de espera muito raro, cedendo a iniciativa central mas evitando toda teoria conhecida."}]
+;
+const BY_ID={}; OPENINGS.forEach(o=>BY_ID[o.id]=o);
+function breadcrumb(op){
+  const chain=[]; let cur=op;
+  while(cur && cur.parent){ cur=BY_ID[cur.parent]; if(cur) chain.unshift(cur.name); }
+  return chain;
+}
+const FAMILIES=['Todas','Abertas','Semiabertas','Fechadas','Indianas','Inglesa','Reti','Flanco','Gambitos','Raiz'];
+const FAMILY_LABEL={Todas:'Todas', Abertas:'Abertas (1.e4 e5)', Semiabertas:'Semiabertas', Fechadas:'Fechadas (1.d4 d5)',
+  Indianas:'Indianas', Inglesa:'Inglesa (1.c4)', Reti:'Réti (1.Nf3)', Flanco:'Flanco', Gambitos:'Gambitos', Raiz:'Sistemas-raiz'};
+
+/* ==================== BUSCA / LISTAGEM ==================== */
+let activeFamily='Todas', query='';
+function normalize(s){ return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function matches(op){
+  if(activeFamily!=='Todas' && op.family!==activeFamily) return false;
+  if(!query) return true;
+  const q=normalize(query);
+  return normalize(op.name).includes(q) || normalize(op.eco).includes(q) || normalize(op.moves).includes(q);
+}
+function renderChips(){
+  const el=document.getElementById('familyChips'); el.innerHTML='';
+  FAMILIES.forEach(f=>{
+    const c=document.createElement('div');
+    c.className='chip'+(f===activeFamily?' active':'');
+    c.textContent=FAMILY_LABEL[f];
+    c.onclick=()=>{ activeFamily=f; renderChips(); renderList(); };
+    el.appendChild(c);
+  });
+}
+function renderList(){
+  const el=document.getElementById('list'); el.innerHTML='';
+  const results = OPENINGS.filter(matches);
+  document.getElementById('resultCount').textContent = `${results.length} resultado${results.length===1?'':'s'}`;
+  if(!results.length){ el.innerHTML='<div class="empty">Nenhuma abertura encontrada. Tente outro termo.</div>'; return; }
+  results.forEach(op=>{
+    const card=document.createElement('button');
+    card.className='card';
+    const bc=breadcrumb(op);
+    card.innerHTML=`<div class="card-top"><div class="card-name">${op.name}</div><div class="card-eco">${op.eco}</div></div>
+      ${bc.length?`<div class="card-breadcrumb">${bc.join(' → ')}</div>`:''}
+      <div class="card-moves">${op.moves}</div>`;
+    card.onclick=()=>openDetail(op.id);
+    el.appendChild(card);
+  });
+}
+document.getElementById('searchBox').addEventListener('input', e=>{ query=e.target.value; renderList(); });
+
+/* ==================== DETALHE + MINI TABULEIRO ==================== */
+let curSnapshots=[], curStep=0;
+function openDetail(id){
+  const op=BY_ID[id];
+  document.getElementById('detailEco').textContent=op.eco;
+  document.getElementById('detailTitle').textContent=op.name;
+  const bc=breadcrumb(op);
+  document.getElementById('detailBreadcrumb').textContent = bc.length ? ('Deriva de: '+bc.join(' → ')) : 'Sistema-raiz';
+  document.getElementById('detailIdea').textContent=op.idea;
+  curSnapshots = replayOpening(op.moves);
+  curStep = curSnapshots.length-1;
+  renderMiniBoard();
+  renderMoveList(op);
+  renderChildren(op);
+  document.getElementById('detailOverlay').classList.add('show');
+  document.getElementById('detailOverlay').scrollTop=0;
+}
+function closeDetail(){ document.getElementById('detailOverlay').classList.remove('show'); }
+function stepMove(delta){
+  curStep=Math.max(0, Math.min(curSnapshots.length-1, curStep+delta));
+  renderMiniBoard();
+}
+function renderMiniBoard(){
+  const snap=curSnapshots[curStep];
+  const el=document.getElementById('miniBoard'); el.innerHTML='';
+  for(let dr=0;dr<8;dr++) for(let dc=0;dc<8;dc++){
+    const r=7-dr, c=dc;
+    const sqEl=document.createElement('div');
+    sqEl.className='msq '+(((r+c)%2===0)?'dark':'light');
+    if(snap.lastMove && ((snap.lastMove.fromR===r&&snap.lastMove.fromC===c)||(snap.lastMove.toR===r&&snap.lastMove.toC===c))) sqEl.classList.add('hi');
+    const piece=snap.board[r][c];
+    if(piece){ const sp=document.createElement('span'); sp.className='p '+(piece.c==='w'?'white':'black'); sp.textContent=GLYPH[piece.c][piece.t]; sqEl.appendChild(sp); }
+    el.appendChild(sqEl);
+  }
+  document.getElementById('stepLabel').textContent=`${curStep}/${curSnapshots.length-1}`;
+  document.getElementById('stepPrev').disabled = curStep===0;
+  document.getElementById('stepNext').disabled = curStep===curSnapshots.length-1;
+}
+function renderMoveList(op){
+  const el=document.getElementById('moveList'); el.innerHTML='';
+  curSnapshots.slice(1).forEach((s,i)=>{
+    const tag=document.createElement('div');
+    tag.className='movetag'+(i+1<=curStep?' done':'');
+    const moveNum = Math.floor(i/2)+1;
+    tag.textContent = (i%2===0?moveNum+'.':'') + s.san;
+    tag.onclick=()=>{ curStep=i+1; renderMiniBoard(); };
+    el.appendChild(tag);
+  });
+}
+function renderChildren(op){
+  const kids = OPENINGS.filter(o=>o.parent===op.id);
+  const section=document.getElementById('childrenSection');
+  if(!kids.length){ section.innerHTML=''; return; }
+  section.innerHTML = `<div class="childrenlbl">CONTRA-ABERTURAS / VARIANTES A PARTIR DAQUI</div>`;
+  const list=document.createElement('div'); list.className='list';
+  kids.forEach(k=>{
+    const card=document.createElement('button');
+    card.className='card';
+    card.innerHTML=`<div class="card-top"><div class="card-name">${k.name}</div><div class="card-eco">${k.eco}</div></div><div class="card-moves">${k.moves}</div>`;
+    card.onclick=()=>openDetail(k.id);
+    list.appendChild(card);
+  });
+  section.appendChild(list);
+}
+
+renderChips();
+renderList();
+</script>
+</body>
+</html>
