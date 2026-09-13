@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#14181a">
-<title>Jogo de Xadrez</title>
+<title>Xadrez — Motor 10 Níveis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -193,7 +193,7 @@ body{background:var(--bg); color:var(--text); font-family:'Fraunces',Georgia,ser
   <section id="screen-home" class="screen active">
     <button class="fsbtn" id="fsBtn" onclick="toggleFullscreen()">⛶</button>
     <div class="setup-box">
-      <h1 class="setup-title">♞ Jogo de Xadrez</h1>
+      <h1 class="setup-title">♞ Xadrez do Davizão</h1>
       <p class="setup-sub">escolha um modo de jogo</p>
       <div class="stack-actions" style="max-width:420px;">
         <button class="modebtn" onclick="openSetupFor('pvp')">
@@ -202,14 +202,14 @@ body{background:var(--bg); color:var(--text); font-family:'Fraunces',Georgia,ser
         </button>
         <button class="modebtn" onclick="goTo('pc-levels'); renderPcLevels();">
           <span class="modebtn-ico">🤖</span>
-          <span class="modebtn-txt"><span class="modebtn-t">Contra o PC</span><span class="modebtn-s">5 níveis, do iniciante ao avançado</span></span>
+          <span class="modebtn-txt"><span class="modebtn-t">Contra o PC</span><span class="modebtn-s">10 níveis · motor com conceitos de LLM</span></span>
         </button>
         <button class="modebtn" onclick="goTo('puzzle-hub'); renderPuzzleHub();">
           <span class="modebtn-ico">🧩</span>
           <span class="modebtn-txt"><span class="modebtn-t">Puzzles de Mate</span><span class="modebtn-s">100 problemas — mate em 2 e em 3</span></span>
         </button>
       </div>
-      <p class="signature">por Rodrigo Aiosa</p>
+      <p class="signature">Desenvolvido por Rodrigo Aiosa</p>
     </div>
   </section>
 
@@ -217,7 +217,7 @@ body{background:var(--bg); color:var(--text); font-family:'Fraunces',Georgia,ser
   <section id="screen-setup" class="screen">
     <button class="backbtn" onclick="goBackFromSetup()">‹</button>
     <div class="setup-box">
-      <h1 class="setup-title" id="setupTitle">♞ Xadrez de Xadrez</h1>
+      <h1 class="setup-title" id="setupTitle">♞ Xadrez do Davizão</h1>
       <p class="setup-sub" id="setupSub">dois jogadores, mesmo aparelho</p>
       <div class="setup-scroll">
         <div class="group-label">SUAS PEÇAS</div>
@@ -274,7 +274,7 @@ body{background:var(--bg); color:var(--text); font-family:'Fraunces',Georgia,ser
     <div class="setup-box">
       <h1 class="setup-title">Contra o PC</h1>
       <p class="setup-sub">vença um nível para liberar o próximo</p>
-      <div class="stack-actions" id="levelGrid" style="max-width:420px;"></div>
+      <div class="setup-scroll" style="width:100%; max-width:420px;"><div class="stack-actions" id="levelGrid"></div></div>
     </div>
   </section>
 
@@ -484,7 +484,7 @@ function openSetupFor(context, level){
     sub.textContent=lvl.name+' · '+lvl.desc;
     rowFlip.style.display='none';
   } else {
-    title.textContent='♞ Xadrez de Xadrez';
+    title.textContent='♞ Xadrez do Davizão';
     sub.textContent='dois jogadores, mesmo aparelho';
     rowFlip.style.display='flex';
   }
@@ -736,15 +736,99 @@ function isInsufficientMaterial(){
 }
 
 /* ==================== IA (MODO CONTRA O PC) ==================== */
+/* Motor de 10 níveis. A estrutura de busca continua sendo minimax + poda alfa-beta
+   (a mesma "matemática" de sempre), mas dois elementos são deliberadamente inspirados
+   em conceitos de LLM, sem chamar nenhuma IA de verdade — tudo roda localmente:
+
+   1) AVALIAÇÃO SENSÍVEL A CONTEXTO: o valor de cada casa do tabuleiro para uma peça
+      muda de acordo com a "fase" da partida (abertura/meio-jogo/final), como um
+      "contexto" que reinterpreta o significado de uma posição — parecido com como
+      embeddings contextuais mudam de acordo com a vizinhança. Peões e reis têm uma
+      tabela para o meio-jogo e outra para o final, misturadas (tapered) proporcional
+      ao material restante em jogo.
+
+   2) AMOSTRAGEM POR TEMPERATURA (softmax): em vez de sempre escolher o lance com a
+      melhor pontuação, o PC sorteia entre os candidatos com uma probabilidade que
+      depende de uma "temperatura" — exatamente o mesmo mecanismo que LLMs usam para
+      gerar texto. Temperatura alta (níveis baixos) = escolhas mais aleatórias entre
+      lances razoáveis. Temperatura baixa (níveis altos) = quase sempre o melhor lance.
+*/
 const AI_LEVELS=[
-  {name:'Iniciante', depth:1, blunder:0.40, timeBudget:300, desc:'joga rápido, comete erros'},
-  {name:'Fácil',     depth:1, blunder:0.15, timeBudget:300, desc:'poucos erros, sem plano'},
-  {name:'Médio',     depth:2, blunder:0,    timeBudget:500, desc:'calcula ~2 lances à frente'},
-  {name:'Difícil',   depth:3, blunder:0,    timeBudget:800, desc:'calcula ~3 lances à frente'},
-  {name:'Avançado',  depth:3, blunder:0, quiesce:true, timeBudget:1000, desc:'evita ciladas óbvias de captura'}
+  {name:'Nível 1',  depth:1, timeBudget:250,  temperature:400, quiesce:false, richContext:false, bookChance:0.20, desc:'quase aleatório, ainda aprendendo'},
+  {name:'Nível 2',  depth:1, timeBudget:300,  temperature:260, quiesce:false, richContext:false, bookChance:0.35, desc:'prefere lances óbvios, erra fácil'},
+  {name:'Nível 3',  depth:2, timeBudget:400,  temperature:170, quiesce:false, richContext:false, bookChance:0.50, desc:'calcula 2 lances à frente'},
+  {name:'Nível 4',  depth:2, timeBudget:500,  temperature:110, quiesce:false, richContext:true,  bookChance:0.60, desc:'já pondera a fase da partida'},
+  {name:'Nível 5',  depth:2, timeBudget:600,  temperature:70,  quiesce:false, richContext:true,  bookChance:0.70, desc:'evita deixar peças penduradas'},
+  {name:'Nível 6',  depth:3, timeBudget:700,  temperature:45,  quiesce:false, richContext:true,  bookChance:0.80, desc:'calcula 3 lances à frente'},
+  {name:'Nível 7',  depth:3, timeBudget:800,  temperature:28,  quiesce:true,  richContext:true,  bookChance:0.88, desc:'confere sequências de captura'},
+  {name:'Nível 8',  depth:3, timeBudget:900,  temperature:15,  quiesce:true,  richContext:true,  bookChance:0.94, desc:'raramente comete erros táticos'},
+  {name:'Nível 9',  depth:4, timeBudget:1100, temperature:6,   quiesce:true,  richContext:true,  bookChance:1.0,  desc:'busca profunda, quase ótimo'},
+  {name:'Nível 10', depth:4, timeBudget:1300, temperature:2,   quiesce:true,  richContext:true,  bookChance:1.0,  desc:'joga essencialmente o melhor lance'}
 ];
+// Livro de aberturas: sequências de lances (SAN, sem números) extraídas da base de aberturas
+// do projeto (base-aberturas-xadrez.html) — embutidas aqui para o jogo funcionar 100% offline,
+// sem depender de buscar outro arquivo pela rede (o que falharia se o jogo for aberto localmente).
+const OPENING_BOOK=["e4","e4 e5","e4 e5 Nf3 Nc6 Bb5","e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7","e4 e5 Nf3 Nc6 Bb5 Nf6","e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6","e4 e5 Nf3 Nc6 Bc4 Bc5","e4 e5 Nf3 Nc6 Bc4 Bc5 b4","e4 e5 Nf3 Nc6 Bc4 Nf6","e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Nxd5 Nxf7","e4 e5 Nf3 Nc6 d4","e4 e5 Nf3 Nc6 d4 exd4 Bc4","e4 e5 Nf3 Nc6 d4 exd4 c3","e4 e5 Nf3 Nf6","e4 e5 Nf3 d6","e4 e5 f4","e4 e5 f4 exf4","e4 e5 f4 Bc5","e4 e5 f4 d5","e4 e5 Nc3","e4 e5 Nc3 Nf6 f4","e4 e5 Bc4","e4 e5 d4 exd4 Qxd4","e4 e5 d4 exd4 c3","e4 e5 Nf3 f5","e4 c5","e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3","e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6","e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 e6","e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 Nc6","e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 Nf6 Nc3 e5","e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nc6","e4 c5 Nf3 e6 d4 cxd4 Nxd4 a6","e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 g6","e4 c5 Nc3","e4 c5 Nc3 Nc6 f4","e4 c5 c3","e4 c5 d4 cxd4 c3","e4 c5 b4","e4 e6","e4 e6 d4 d5 e5","e4 e6 d4 d5 exd5 exd5","e4 e6 d4 d5 Nd2","e4 e6 d4 d5 Nc3 Nf6","e4 e6 d4 d5 Nc3 Bb4","e4 c6","e4 c6 d4 d5 e5","e4 c6 d4 d5 exd5 cxd5","e4 c6 d4 d5 exd5 cxd5 c4","e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5","e4 c6 Nc3 d5 Nf3","e4 d5 exd5 Qxd5","e4 Nf6","e4 Nf6 e5 Nd5 d4 d6 c4 Nb6 f4","e4 d6 d4 Nf6 Nc3 g6","e4 g6","e4 Nc6","e4 b6","d4","d4 d5","d4 d5 c4","d4 d5 c4 dxc4","d4 d5 c4 e6","d4 d5 c4 c6","d4 d5 c4 c6 Nc3 Nf6 e3 e6","d4 d5 c4 e6 Nc3 c5","d4 d5 c4 Nc6","d4 d5 c4 e5","d4 d5 Bf4","d4 d5 Nf3 Nf6 e3","d4 Nf6 c4 e6 g3","d4 Nf6","d4 Nf6 c4 e6 Nc3 Bb4","d4 Nf6 c4 e6 Nf3 b6","d4 Nf6 c4 e6 Nf3 Bb4+","d4 Nf6 c4 g6 Nc3 Bg7","d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f3","d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4","d4 Nf6 c4 g6 Nc3 d5","d4 Nf6 c4 c5 d5 e6","d4 Nf6 c4 c5 d5 b5","d4 c5","d4 Nf6 c4 e5","d4 Nf6 c4 d6","d4 Nf6 Bg5","d4 Nf6 Nc3 d5 Bg5","d4 f5","d4 f5 g3 Nf6 Bg2 g6","d4 f5 Nf3 Nf6 g3 e6 Bg2 d5","d4 e5","d4 Nf6 Nc3 d5 e4","c4","c4 e5","c4 c5","c4 Nf6","c4 e6","Nf3","Nf3 d5","Nf3 d5 g3","f4","f4 e5","b3","b4","g4","Nc3","a3"];
+function stripSanSuffix(s){ return s.replace(/[+#]+$/,''); }
+// Versões genéricas de SAN/desambiguação que operam sobre um `state` explícito (não o tabuleiro global),
+// usadas apenas para consultar o livro de aberturas contra o estado hipotético do lance da IA.
+function sanOfMoveInState(state, mv){
+  if(mv.flag==='O-O') return 'O-O';
+  if(mv.flag==='O-O-O') return 'O-O-O';
+  const piece=state.board[mv.fromR][mv.fromC];
+  const dest=sq(mv.toR,mv.toC);
+  if(piece.t==='P'){
+    let s = mv.capture ? (FILES[mv.fromC]+'x'+dest) : dest;
+    if(mv.promo) s+='='+mv.promo;
+    return s;
+  }
+  const rivals=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    if(r===mv.fromR && c===mv.fromC) continue;
+    const p=state.board[r][c];
+    if(p && p.c===piece.c && p.t===piece.t){
+      const legal=allLegalMovesForState(state,piece.c).filter(m=>m.fromR===r&&m.fromC===c);
+      if(legal.some(m=>m.toR===mv.toR && m.toC===mv.toC)) rivals.push({r,c});
+    }
+  }
+  let dis='';
+  if(rivals.length){
+    const sameFile=rivals.some(o=>o.c===mv.fromC), sameRank=rivals.some(o=>o.r===mv.fromR);
+    if(!sameFile) dis=FILES[mv.fromC]; else if(!sameRank) dis=String(mv.fromR+1); else dis=FILES[mv.fromC]+String(mv.fromR+1);
+  }
+  return piece.t+dis+(mv.capture?'x':'')+dest;
+}
+function resolveOpeningToken(state, token){
+  const target=stripSanSuffix(token);
+  const legal=allLegalMovesForState(state, state.turn);
+  for(const mv of legal){ if(stripSanSuffix(sanOfMoveInState(state,mv))===target) return mv; }
+  return null;
+}
+// Procura, entre todas as linhas do livro, quais continuam exatamente o histórico já jogado
+// na partida e devolve um lance sorteado entre os candidatos (ponderado pela frequência —
+// quanto mais linhas "conhecem" aquele próximo lance, mais peso ele tem).
+function pickBookMove(state){
+  const history=moves.map(stripSanSuffix);
+  const candidates={};
+  for(const line of OPENING_BOOK){
+    const toks=line.split(' ');
+    if(toks.length<=history.length) continue;
+    let ok=true;
+    for(let i=0;i<history.length;i++){ if(toks[i]!==history[i]){ ok=false; break; } }
+    if(!ok) continue;
+    const next=toks[history.length];
+    candidates[next]=(candidates[next]||0)+1;
+  }
+  const tokens=Object.keys(candidates);
+  if(!tokens.length) return null;
+  const total=tokens.reduce((s,t)=>s+candidates[t],0);
+  let r=Math.random()*total;
+  let chosen=tokens[0];
+  for(const t of tokens){ r-=candidates[t]; if(r<=0){ chosen=t; break; } }
+  return resolveOpeningToken(state, chosen);
+}
 const PIECE_VAL={P:100,N:320,B:330,R:500,Q:900,K:20000};
-const PAWN_PST=[
+const PAWN_PST_MG=[
   [0,0,0,0,0,0,0,0],
   [5,10,10,-10,-10,10,10,5],
   [5,-5,-10,0,0,-10,-5,5],
@@ -752,6 +836,16 @@ const PAWN_PST=[
   [5,5,10,25,25,10,5,5],
   [10,10,20,30,30,20,10,10],
   [50,50,50,50,50,50,50,50],
+  [0,0,0,0,0,0,0,0]
+];
+const PAWN_PST_EG=[
+  [0,0,0,0,0,0,0,0],
+  [10,10,10,10,10,10,10,10],
+  [15,15,15,15,15,15,15,15],
+  [25,25,25,25,25,25,25,25],
+  [40,40,40,40,40,40,40,40],
+  [60,60,60,60,60,60,60,60],
+  [90,90,90,90,90,90,90,90],
   [0,0,0,0,0,0,0,0]
 ];
 const KNIGHT_PST=[
@@ -764,10 +858,101 @@ const KNIGHT_PST=[
   [-40,-20,0,0,0,0,-20,-40],
   [-50,-40,-30,-30,-30,-30,-40,-50]
 ];
+const BISHOP_PST=[
+  [-20,-10,-10,-10,-10,-10,-10,-20],
+  [-10,0,0,0,0,0,0,-10],
+  [-10,0,5,10,10,5,0,-10],
+  [-10,5,5,10,10,5,5,-10],
+  [-10,0,10,10,10,10,0,-10],
+  [-10,10,10,10,10,10,10,-10],
+  [-10,5,0,0,0,0,5,-10],
+  [-20,-10,-10,-10,-10,-10,-10,-20]
+];
+const ROOK_PST=[
+  [0,0,0,0,0,0,0,0],
+  [-5,0,0,0,0,0,0,-5],
+  [-5,0,0,0,0,0,0,-5],
+  [-5,0,0,0,0,0,0,-5],
+  [-5,0,0,0,0,0,0,-5],
+  [-5,0,0,0,0,0,0,-5],
+  [5,10,10,10,10,10,10,5],
+  [0,0,0,5,5,0,0,0]
+];
+const QUEEN_PST=[
+  [-20,-10,-10,-5,-5,-10,-10,-20],
+  [-10,0,0,0,0,0,0,-10],
+  [-10,0,5,5,5,5,0,-10],
+  [-5,0,5,5,5,5,0,-5],
+  [0,0,5,5,5,5,0,-5],
+  [-10,5,5,5,5,5,0,-10],
+  [-10,0,5,0,0,0,0,-10],
+  [-20,-10,-10,-5,-5,-10,-10,-20]
+];
+const KING_PST_MG=[
+  [20,30,10,0,0,10,30,20],
+  [20,20,0,0,0,0,20,20],
+  [-10,-20,-20,-20,-20,-20,-20,-10],
+  [-20,-30,-30,-40,-40,-30,-30,-20],
+  [-30,-40,-40,-50,-50,-40,-40,-30],
+  [-30,-40,-40,-50,-50,-40,-40,-30],
+  [-30,-40,-40,-50,-50,-40,-40,-30],
+  [-30,-40,-40,-50,-50,-40,-40,-30]
+];
+const KING_PST_EG=[
+  [-50,-30,-30,-30,-30,-30,-30,-50],
+  [-30,-30,0,0,0,0,-30,-30],
+  [-30,-10,20,30,30,20,-10,-30],
+  [-30,-10,30,40,40,30,-10,-30],
+  [-30,-10,30,40,40,30,-10,-30],
+  [-30,-10,20,30,30,20,-10,-30],
+  [-30,-20,-10,0,0,-10,-20,-30],
+  [-50,-40,-30,-20,-20,-30,-40,-50]
+];
+const PHASE_VAL={P:0,N:1,B:1,R:2,Q:4,K:0};
+const TOTAL_PHASE=24; // 4 cavalos+4 bispos+4 torres+2 damas, na composição inicial
 function pstValue(table,r,c,color){ return color==='w' ? table[r][c] : table[7-r][c]; }
-
+function gamePhase(bd){
+  let phase=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){ const p=bd[r][c]; if(p) phase+=(PHASE_VAL[p.t]||0); }
+  return Math.min(phase, TOTAL_PHASE);
+}
+// Mistura (tapering) o valor de meio-jogo e de final conforme o "contexto" (material restante).
+function pstTaper(mgTable,egTable,r,c,color,phase){
+  const mgV=pstValue(mgTable,r,c,color), egV=pstValue(egTable,r,c,color);
+  return (mgV*phase + egV*(TOTAL_PHASE-phase))/TOTAL_PHASE;
+}
+// Penaliza peças atacadas e sem defesa ("penduradas") — uma noção simples de coordenação:
+// quanto mais "atenção" (peças amigas) protegendo uma casa importante, melhor.
+function coordinationScore(bd){
+  let score=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=bd[r][c]; if(!p || p.t==='K') continue;
+    if(isSquareAttacked(bd,r,c,opp(p.c)) && !isSquareAttacked(bd,r,c,p.c)){
+      const penalty=PIECE_VAL[p.t]*0.15;
+      score += (p.c==='w') ? -penalty : penalty;
+    }
+  }
+  return score;
+}
+function evaluateBoard(bd, richContext){
+  const phase=gamePhase(bd);
+  let score=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=bd[r][c]; if(!p) continue;
+    let val=PIECE_VAL[p.t];
+    if(p.t==='P') val+=pstTaper(PAWN_PST_MG,PAWN_PST_EG,r,c,p.c,phase);
+    else if(p.t==='N') val+=pstValue(KNIGHT_PST,r,c,p.c);
+    else if(p.t==='B') val+=pstValue(BISHOP_PST,r,c,p.c);
+    else if(p.t==='R') val+=pstValue(ROOK_PST,r,c,p.c);
+    else if(p.t==='Q') val+=pstValue(QUEEN_PST,r,c,p.c);
+    else if(p.t==='K') val+=pstTaper(KING_PST_MG,KING_PST_EG,r,c,p.c,phase);
+    score += (p.c==='w'?val:-val);
+  }
+  if(richContext) score += coordinationScore(bd);
+  return score;
+}
 // Funções genéricas baseadas em estado explícito {board,castling,epTarget,turn} — usadas pela IA
-// para simular lances futuros sem tocar no estado global da partida em andamento.
+// e pelos puzzles para simular lances futuros sem tocar no estado global da partida em andamento.
 function legalMovesForState(state,r,c){
   const piece=state.board[r][c]; if(!piece) return [];
   const pseudo=generatePseudoMoves(state.board,r,c,state.castling,state.epTarget);
@@ -796,21 +981,6 @@ function applyMoveToState(state,move){
   const epTargetN=(move.flag==='double') ? {r:(move.fromR+move.toR)/2, c:move.fromC} : null;
   return {board:bd, castling:castlingN, epTarget:epTargetN, turn:opp(state.turn)};
 }
-function evaluateBoard(bd){
-  let score=0;
-  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
-    const p=bd[r][c]; if(!p) continue;
-    let val=PIECE_VAL[p.t];
-    if(p.t==='P') val+=pstValue(PAWN_PST,r,c,p.c);
-    else if(p.t==='N') val+=pstValue(KNIGHT_PST,r,c,p.c);
-    else if(p.t!=='K'){
-      if((r===3||r===4)&&(c===3||c===4)) val+=12;
-      else if(r>=2&&r<=5&&c>=2&&c<=5) val+=4;
-    }
-    score += (p.c==='w'?val:-val);
-  }
-  return score;
-}
 function moveScore(mv,bd){
   let s=0;
   if(mv.capture){
@@ -823,7 +993,7 @@ function moveScore(mv,bd){
 }
 function orderMoves(moves,bd){ moves.sort((a,b)=>moveScore(b,bd)-moveScore(a,bd)); }
 
-function minimax(state,depth,alpha,beta,useQuiesce,deadline){
+function minimax(state,depth,alpha,beta,useQuiesce,richContext,deadline){
   if(Date.now()>deadline) return null;
   const legal=allLegalMovesForState(state,state.turn);
   if(legal.length===0){
@@ -831,12 +1001,12 @@ function minimax(state,depth,alpha,beta,useQuiesce,deadline){
     if(inCheck) return state.turn==='w' ? -99000-depth : 99000+depth;
     return 0;
   }
-  if(depth<=0) return useQuiesce ? quiesce(state,alpha,beta,2,deadline) : evaluateBoard(state.board);
+  if(depth<=0) return useQuiesce ? quiesce(state,alpha,beta,2,richContext,deadline) : evaluateBoard(state.board,richContext);
   orderMoves(legal,state.board);
   if(state.turn==='w'){
     let best=-Infinity;
     for(const mv of legal){
-      const val=minimax(applyMoveToState(state,mv),depth-1,alpha,beta,useQuiesce,deadline);
+      const val=minimax(applyMoveToState(state,mv),depth-1,alpha,beta,useQuiesce,richContext,deadline);
       if(val===null) return null;
       if(val>best) best=val;
       if(best>alpha) alpha=best;
@@ -846,7 +1016,7 @@ function minimax(state,depth,alpha,beta,useQuiesce,deadline){
   } else {
     let best=Infinity;
     for(const mv of legal){
-      const val=minimax(applyMoveToState(state,mv),depth-1,alpha,beta,useQuiesce,deadline);
+      const val=minimax(applyMoveToState(state,mv),depth-1,alpha,beta,useQuiesce,richContext,deadline);
       if(val===null) return null;
       if(val<best) best=val;
       if(best<beta) beta=best;
@@ -855,48 +1025,67 @@ function minimax(state,depth,alpha,beta,useQuiesce,deadline){
     return best;
   }
 }
-function quiesce(state,alpha,beta,limit,deadline){
+function quiesce(state,alpha,beta,limit,richContext,deadline){
   if(Date.now()>deadline) return null;
-  const standPat=evaluateBoard(state.board);
+  const standPat=evaluateBoard(state.board,richContext);
   if(state.turn==='w'){ if(standPat>=beta) return beta; if(alpha<standPat) alpha=standPat; }
   else { if(standPat<=alpha) return alpha; if(beta>standPat) beta=standPat; }
   if(limit<=0) return state.turn==='w'?alpha:beta;
   let caps=allLegalMovesForState(state,state.turn).filter(m=>m.capture);
   orderMoves(caps,state.board);
-  caps=caps.slice(0,4); // limita a ramificação da quiescência (só as capturas mais valiosas)
+  caps=caps.slice(0,4);
   for(const mv of caps){
-    const val=quiesce(applyMoveToState(state,mv),alpha,beta,limit-1,deadline);
+    const val=quiesce(applyMoveToState(state,mv),alpha,beta,limit-1,richContext,deadline);
     if(val===null) return null;
     if(state.turn==='w'){ if(val>alpha) alpha=val; if(alpha>=beta) return beta; }
     else { if(val<beta) beta=val; if(beta<=alpha) return alpha; }
   }
   return state.turn==='w'?alpha:beta;
 }
+// Amostragem por temperatura (softmax) — o mesmo mecanismo usado por LLMs para gerar texto,
+// aqui aplicado à escolha do lance: temperatura alta = mais aleatório; baixa = quase sempre o melhor.
+function softmaxSample(candidates, temperature){
+  if(candidates.length===1) return candidates[0].move;
+  if(temperature<=1){
+    let best=candidates[0];
+    for(const cand of candidates) if(cand.score>best.score) best=cand;
+    return best.move;
+  }
+  const maxScore=Math.max(...candidates.map(cand=>cand.score));
+  const weights=candidates.map(cand=>Math.exp((cand.score-maxScore)/temperature));
+  const total=weights.reduce((a,b)=>a+b,0);
+  let r=Math.random()*total;
+  for(let i=0;i<candidates.length;i++){ r-=weights[i]; if(r<=0) return candidates[i].move; }
+  return candidates[candidates.length-1].move;
+}
 function computeAIMove(level){
   const cfg=AI_LEVELS[level-1];
   const state={board:cloneBoard(board), castling:{...castling}, epTarget: epTarget?{...epTarget}:null, turn:aiColor};
   const legal=allLegalMovesForState(state,aiColor);
   if(!legal.length) return null;
-  if(Math.random()<cfg.blunder) return legal[Math.floor(Math.random()*legal.length)];
+  if(moves.length<20 && Math.random()<(cfg.bookChance||0)){
+    const bookMv=pickBookMove(state);
+    if(bookMv) return bookMv;
+  }
   orderMoves(legal,state.board);
   // aprofundamento iterativo com orçamento de tempo: garante resposta rápida em qualquer aparelho,
-  // usando o melhor lance da última profundidade concluída caso o tempo acabe no meio de uma busca mais funda.
+  // usando os candidatos da última profundidade concluída caso o tempo acabe no meio de uma busca mais funda.
   const deadline=Date.now()+(cfg.timeBudget||700);
-  let bestOverall=legal[0];
+  let bestCandidates=legal.map(mv=>({move:mv, score:0}));
   for(let d=1; d<=cfg.depth; d++){
-    let bestVal=Infinity, bestMoves=[], timedOut=false;
+    const roundCandidates=[]; let timedOut=false;
     for(const mv of legal){
       const ns=applyMoveToState(state,mv);
-      const val=minimax(ns,d-1,-Infinity,Infinity,!!cfg.quiesce,deadline);
+      const val=minimax(ns,d-1,-Infinity,Infinity,!!cfg.quiesce,!!cfg.richContext,deadline);
       if(val===null){ timedOut=true; break; }
-      if(val<bestVal-0.001){ bestVal=val; bestMoves=[mv]; }
-      else if(Math.abs(val-bestVal)<0.001) bestMoves.push(mv);
+      const score = aiColor==='w' ? val : -val; // "quanto melhor pra quem está escolhendo"
+      roundCandidates.push({move:mv, score});
     }
     if(timedOut) break;
-    bestOverall=bestMoves[Math.floor(Math.random()*bestMoves.length)];
+    bestCandidates=roundCandidates;
     if(Date.now()>deadline) break;
   }
-  return bestOverall;
+  return softmaxSample(bestCandidates, cfg.temperature);
 }
 function scheduleAIMove(){
   aiThinking=true;
@@ -1067,7 +1256,7 @@ function buildPGN(){
   }
   const result = gameResult || '*';
   const date=new Date().toISOString().slice(0,10).replace(/-/g,'.');
-  const header=`[Event "Xadrez de Xadrez"]\n[Date "${date}"]\n[White "Brancas"]\n[Black "Pretas"]\n[Result "${result}"]\n\n`;
+  const header=`[Event "Xadrez do Davizão"]\n[Date "${date}"]\n[White "Brancas"]\n[Black "Pretas"]\n[Result "${result}"]\n\n`;
   return header+body.trim()+' '+result;
 }
 function toWinAnsiSafe(s){
@@ -1201,7 +1390,7 @@ function downloadNotationPDF(){
     bodyLines.push(num.padEnd(5)+String(moves[i]||'').padEnd(12)+String(moves[i+1]||''));
   }
   if(!bodyLines.length) bodyLines.push('(nenhum lance registrado)');
-  const pdfStr=buildGameNotationPDF('Xadrez de Xadrez — Notação da Partida', subtitleLines, bodyLines, boardSnapshots);
+  const pdfStr=buildGameNotationPDF('Xadrez do Davizão — Notação da Partida', subtitleLines, bodyLines, boardSnapshots);
   const blob=new Blob([strToPdfBytes(pdfStr)], {type:'application/pdf'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
