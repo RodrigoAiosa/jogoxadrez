@@ -1690,17 +1690,35 @@ function recomputeBoardSize(){
     document.documentElement.style.setProperty('--board-size', size+'px');
   }catch(e){}
 }
+/* Além de recalcular o tamanho, isso força o Chromium a re-rasterizar a
+   página inteira na escala/DPI correta. Só recalcular o CSS não basta
+   quando o bug é no compositor (a página "pinta" a aba com a escala do
+   monitor antigo mesmo com o layout já correto): remover e reinserir o
+   elemento raiz da árvore de renderização obriga um repaint completo. */
+function forceFullRepaint(){
+  try{
+    const el=document.documentElement;
+    const prevDisplay=el.style.display;
+    el.style.display='none';
+    void el.offsetHeight; // força o reflow
+    el.style.display=prevDisplay;
+  }catch(e){}
+}
+function refreshBoardLayout(){
+  recomputeBoardSize();
+  forceFullRepaint();
+}
 function watchDevicePixelRatio(){
   try{
     const dpr=window.devicePixelRatio||1;
     const mq=window.matchMedia(`(resolution: ${dpr}dppx)`);
-    const handler=()=>{ recomputeBoardSize(); watchDevicePixelRatio(); };
+    const handler=()=>{ refreshBoardLayout(); watchDevicePixelRatio(); };
     if(mq.addEventListener) mq.addEventListener('change', handler, {once:true});
     else if(mq.addListener) mq.addListener(handler);
   }catch(e){}
 }
-window.addEventListener('resize', recomputeBoardSize);
-window.addEventListener('orientationchange', recomputeBoardSize);
+window.addEventListener('resize', refreshBoardLayout);
+window.addEventListener('orientationchange', refreshBoardLayout);
 recomputeBoardSize();
 watchDevicePixelRatio();
 /* Reforço: alguns navegadores não disparam nenhum evento confiável quando
@@ -1711,7 +1729,7 @@ setInterval(()=>{
   const w=window.innerWidth, h=window.innerHeight, dpr=window.devicePixelRatio||1;
   if(w!==_lastBoardW || h!==_lastBoardH || dpr!==_lastDpr){
     _lastBoardW=w; _lastBoardH=h; _lastDpr=dpr;
-    recomputeBoardSize();
+    refreshBoardLayout();
   }
 }, 500);
 
