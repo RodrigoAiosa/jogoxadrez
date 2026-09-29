@@ -90,11 +90,12 @@ body{background:var(--bg); color:var(--text); font-family:'Fraunces',Georgia,ser
 .flip180{transform:rotate(180deg);}
 
 #boardWrap{flex:1; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:0; position:relative; gap:4px;}
-.capturedStrip{width:min(94vw, 78vh, 620px); max-width:620px; height:30px; display:flex; align-items:center;
+:root{--board-size:min(94vw, 78vh, 620px);}
+.capturedStrip{width:var(--board-size); max-width:620px; height:30px; display:flex; align-items:center;
   flex-wrap:wrap; overflow:hidden; gap:3px; flex-shrink:0;}
 .capturedStrip span{font-size:22px; opacity:0.85; line-height:1;}
 #board, #puzzleBoard{display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr);
-  width:min(94vw, 78vh, 620px); height:min(94vw, 78vh, 620px);
+  width:var(--board-size); height:var(--board-size);
   border:3px solid var(--panel-2); border-radius:6px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.4);}
 .sq{position:relative; display:flex; align-items:center; justify-content:center;}
 .sq.light{background:var(--sq-light);}
@@ -180,7 +181,7 @@ body{background:var(--bg); color:var(--text); font-family:'Fraunces',Georgia,ser
 .puzzle-mini.current{border-color:var(--text); color:var(--text);}
 #screen-puzzle{padding-top:calc(var(--safe-t) + 8px); padding-bottom:calc(var(--safe-b) + 10px); align-items:center;}
 #puzzleBoardWrap{flex:1; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:0; gap:14px;}
-.puzzle-banner{width:min(94vw, 78vh, 620px); max-width:620px; text-align:center; font-size:14px; padding:10px 16px;
+.puzzle-banner{width:var(--board-size); max-width:620px; text-align:center; font-size:14px; padding:10px 16px;
   border-radius:12px; background:var(--panel); border:1px solid var(--border); color:var(--text-dim); font-family:'JetBrains Mono',monospace;}
 .puzzle-banner.ok{border-color:var(--amber); color:var(--amber); background:var(--amber-soft);}
 .puzzle-banner.err{border-color:var(--red); color:var(--red); background:var(--red-glow);}
@@ -1673,6 +1674,35 @@ function loop(){
 async function requestWakeLock(){ try{ if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); }catch(e){} }
 function releaseWakeLock(){ if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; } }
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && running && !wakeLock) requestWakeLock(); });
+
+/* ==================== TABULEIRO: TAMANHO RECALCULADO VIA JS ====================
+   Corrige um bug conhecido do Chromium: mover a janela entre monitores com
+   DPI (devicePixelRatio) diferentes nem sempre dispara um relayout correto
+   de unidades vw/vh, deixando o tabuleiro CSS Grid não-quadrado/cortado.
+   Aqui recalculamos o tamanho em pixels (espelhando a fórmula
+   min(94vw, 78vh, 620px)) e aplicamos via variável CSS, refazendo o cálculo
+   em resize, orientationchange e sempre que o DPI da tela mudar. */
+function recomputeBoardSize(){
+  try{
+    const vw=window.innerWidth||document.documentElement.clientWidth||0;
+    const vh=window.innerHeight||document.documentElement.clientHeight||0;
+    const size=Math.max(0, Math.min(vw*0.94, vh*0.78, 620));
+    document.documentElement.style.setProperty('--board-size', size+'px');
+  }catch(e){}
+}
+function watchDevicePixelRatio(){
+  try{
+    const dpr=window.devicePixelRatio||1;
+    const mq=window.matchMedia(`(resolution: ${dpr}dppx)`);
+    const handler=()=>{ recomputeBoardSize(); watchDevicePixelRatio(); };
+    if(mq.addEventListener) mq.addEventListener('change', handler, {once:true});
+    else if(mq.addListener) mq.addListener(handler);
+  }catch(e){}
+}
+window.addEventListener('resize', recomputeBoardSize);
+window.addEventListener('orientationchange', recomputeBoardSize);
+recomputeBoardSize();
+watchDevicePixelRatio();
 
 /* ==================== PUZZLES: INTERFACE DE JOGO ==================== */
 let puzzleState=null, puzzleOrientation='w', puzzlePlyLeft=0, puzzleSelected=null;
