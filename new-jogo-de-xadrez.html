@@ -534,7 +534,17 @@ function freshBoard(){
   return b;
 }
 
+function enterFullscreen(){
+  try{
+    const el=document.documentElement;
+    const req=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen;
+    if(req && !document.fullscreenElement && !document.webkitFullscreenElement){
+      req.call(el).catch ? req.call(el).catch(()=>{}) : req.call(el);
+    }
+  }catch(e){}
+}
 function startGame(){
+  enterFullscreen();
   mode=setupContext; pcLevel=pendingPcLevel;
   board=freshBoard();
   turn='w';
@@ -1752,6 +1762,7 @@ function renderPuzzleHub(){
   }
 }
 function startPuzzleFlow(){
+  enterFullscreen();
   let idx=1;
   for(let i=1;i<=PUZZLES.length;i++){ if(!puzzleSolvedSet.has(i)){ idx=i; break; } }
   loadPuzzle(idx);
