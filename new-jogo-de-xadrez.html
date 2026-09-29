@@ -1703,6 +1703,17 @@ window.addEventListener('resize', recomputeBoardSize);
 window.addEventListener('orientationchange', recomputeBoardSize);
 recomputeBoardSize();
 watchDevicePixelRatio();
+/* Reforço: alguns navegadores não disparam nenhum evento confiável quando
+   só o DPI muda (ex.: arrastar a janela para outro monitor sem redimensionar).
+   Um polling leve garante a correção mesmo quando nenhum evento dispara. */
+let _lastBoardW=window.innerWidth, _lastBoardH=window.innerHeight, _lastDpr=window.devicePixelRatio||1;
+setInterval(()=>{
+  const w=window.innerWidth, h=window.innerHeight, dpr=window.devicePixelRatio||1;
+  if(w!==_lastBoardW || h!==_lastBoardH || dpr!==_lastDpr){
+    _lastBoardW=w; _lastBoardH=h; _lastDpr=dpr;
+    recomputeBoardSize();
+  }
+}, 500);
 
 /* ==================== PUZZLES: INTERFACE DE JOGO ==================== */
 let puzzleState=null, puzzleOrientation='w', puzzlePlyLeft=0, puzzleSelected=null;
